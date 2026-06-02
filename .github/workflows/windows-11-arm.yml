@@ -1,0 +1,36 @@
+name: windows-11-arm
+on:
+  # push:
+  #  branches: [master]
+  # pull_request:
+  #  branches: [master]
+  workflow_dispatch:
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:  # https://github.com/actions/runner-images#available-images
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - run: choco install fluidsynth  # fluidsynth-2.4.7-win10-x64
+      - run: fluidsynth -V  # FluidSynth runtime version 2.4.7
+      - run: dir C:\tools\fluidsynth\bin\libfluidsynth-3.dll  # File exists
+      - shell: python
+        continue-on-error: ${{ matrix.os == 'windows-11-arm' }}
+        run: |
+          import os
+          from ctypes import CDLL
+          from ctypes.util import find_library
+
+          os.add_dll_directory("C:\\tools\\fluidsynth\\bin")
+          # Workaround bug in find_library() that ignores os.add_dll_directory().
+          os.environ['PATH'] += ';C:\\tools\\fluidsynth\\bin'
+          lib_path = find_library("libfluidsynth-3")
+          print(f"{lib_path = }")  # lib_path = 'C:\\tools\\fluidsynth\\bin\\libfluidsynth-3.dll'
+          libfluidsynth = CDLL(lib_path)  # ARM: OSError: [WinError 193] %1 is not a valid Win32 application
+          print(f"{libfluidsynth = }")    # non-ARM: libfluidsynth = <CDLL 'C:\tools\fluidsynth\bin\libfluidsynth-3.dll', ...>
